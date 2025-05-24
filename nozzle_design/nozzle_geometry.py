@@ -1,6 +1,6 @@
 """Module for nozzle geometry calculations and optimization."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, Optional
 import numpy as np
 from scipy.optimize import minimize
@@ -15,20 +15,27 @@ class NozzleSegment:
     end_x: float
     start_radius: float
     end_radius: float
-    angle: float
-    length: float
-    area_ratio: float
-    mach_number: float
-    pressure: float
-    temperature: float
-    wall_temperature: float
-    heat_flux: float
+    angle: float = 0.0
+    length: float = 0.0
+    area_ratio: float = 1.0
+    mach_number: float = 0.0
+    pressure: float = 0.0
+    temperature: float = 0.0
+    wall_temperature: float = 0.0
+    heat_flux: float = 0.0
+    type: str = 'generic'  # e.g., 'converging', 'throat', 'diverging'
 
 @dataclass
 class NozzleGeometry:
     """Represents the complete nozzle geometry with performance metrics."""
     segments: List[NozzleSegment]
     performance_metrics: Dict[str, float]
+    length: float
+    throat_radius: float
+    exit_radius: float
+    expansion_ratio: float
+    wall_angle: float
+    # Add more fields as needed
 
 class NozzleGeometryCalculator:
     """Calculator for nozzle geometry and optimization."""
@@ -81,7 +88,7 @@ class NozzleGeometryCalculator:
         # Calculate performance metrics
         metrics = self._calculate_performance_metrics(segments, chamber_state)
         
-        return NozzleGeometry(segments=segments, performance_metrics=metrics)
+        return NozzleGeometry(segments=segments, performance_metrics=metrics, length=length, throat_radius=throat_radius, exit_radius=exit_radius, expansion_ratio=exit_area/throat_area, wall_angle=np.arctan2(exit_radius-throat_radius, length))
     
     def optimize_for_thrust(self,
                           thrust: float,
@@ -277,7 +284,8 @@ class NozzleGeometryCalculator:
                 pressure=flow_props['pressure'],
                 temperature=flow_props['temperature'],
                 wall_temperature=thermal_props['wall_temperature'],
-                heat_flux=thermal_props['heat_flux']
+                heat_flux=thermal_props['heat_flux'],
+                type='converging'
             )
             
             segments.append(segment)

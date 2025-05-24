@@ -1,28 +1,52 @@
-"""Module for Gmsh mesh generation and visualization of nozzle designs."""
+"""Module for Gmsh mesh generation and visualization."""
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 import numpy as np
 import gmsh
 import pygmsh
 from pathlib import Path
 
-from .nozzle_geometry import NozzleSegment
-
 class GmshVisualizer:
-    """Visualizer for nozzle designs using Gmsh."""
+    """Class for Gmsh mesh generation and visualization."""
     
-    def __init__(self, segments: List[NozzleSegment]):
-        """Initialize the visualizer with nozzle segments.
+    def __init__(self, nozzle):
+        """Initialize visualizer.
         
         Args:
-            segments: List of nozzle segments
+            nozzle: Nozzle geometry object or list of NozzleSegment
         """
-        self.segments = segments
+        # Accept either a geometry object (with .length) or a list of segments
         self.geometry = None
         self.mesh = None
+        if hasattr(nozzle, 'length') and hasattr(nozzle, 'get_radius'):
+            self.nozzle = nozzle
+        elif isinstance(nozzle, list) and len(nozzle) > 0 and hasattr(nozzle[0], 'start_x'):
+            # Assume list of NozzleSegment
+            self.nozzle = self._make_geometry_from_segments(nozzle)
+        else:
+            raise ValueError("Invalid nozzle input: must be geometry object or list of NozzleSegment")
     
-    def generate_geometry(self, resolution: int = 32) -> None:
-        """Generate Gmsh geometry from nozzle segments.
+    def _make_geometry_from_segments(self, segments):
+        # Create a simple geometry-like object from segments
+        class SegGeom:
+            def __init__(self, segments):
+                self.segments = segments
+                self.length = segments[-1].end_x
+            def get_radius(self, x):
+                # Find which segment x is in
+                for seg in self.segments:
+                    if seg.start_x <= x <= seg.end_x:
+                        # Linear interpolation
+                        t = (x - seg.start_x) / (seg.end_x - seg.start_x) if seg.end_x != seg.start_x else 0
+                        return seg.start_radius + t * (seg.end_radius - seg.start_radius)
+                # If x is out of bounds, return the closest endpoint
+                if x < self.segments[0].start_x:
+                    return self.segments[0].start_radius
+                return self.segments[-1].end_radius
+        return SegGeom(segments)
+    
+    def generate_geometry(self, resolution: int = 100) -> None:
+        """Generate Gmsh geometry from nozzle.
         
         Args:
             resolution: Number of points around circumference
@@ -31,58 +55,77 @@ class GmshVisualizer:
         gmsh.initialize()
         
         # Create geometry
-        self.geometry = pygmsh.geo.Geometry()
-        
-        # Generate points for each segment
-        points = []
-        for segment in self.segments:
-            # Generate points around circumference
-            angles = np.linspace(0, 2*np.pi, resolution, endpoint=False)
+        with pygmsh.geo.Geometry() as geom:
+            # Generate points along nozzle
+            x = np.linspace(0, self.nozzle.length, resolution)
+            theta = np.linspace(0, 2*np.pi, resolution)
             
-            for angle in angles:
-                x = segment.start_x
-                y = segment.start_radius * np.cos(angle)
-                z = segment.start_radius * np.sin(angle)
-                points.append(self.geometry.add_point([x, y, z]))
-        
-        # Create lines between points
-        lines = []
-        for i in range(len(points) - 1):
-            lines.append(self.geometry.add_line(points[i], points[i + 1]))
-        
-        # Create surface
-        surface = self.geometry.add_surface(lines)
-        
-        # Set mesh size
-        self.geometry.set_mesh_size_callback(lambda dim, tag, x, y, z, lc: 0.1)
-        
-        # Generate mesh
-        self.mesh = self.geometry.generate_mesh()
+            # Create points
+            points = []
+            for xi in x:
+                r = self.nozzle.get_radius(xi)
+                for thetai in theta:
+                    points.append(geom.add_point([
+                        xi,
+                        r * np.cos(thetai),
+                        r * np.sin(thetai)
+                    ]))
+            
+            # Create lines
+            lines = []
+            for i in range(resolution - 1):
+                for j in range(resolution - 1):
+                    # Calculate point indices
+                    p1 = i * resolution + j
+                    p2 = i * resolution + j + 1
+                    p3 = (i + 1) * resolution + j
+                    p4 = (i + 1) * resolution + j + 1
+                    
+                    # Add lines
+                    lines.append(geom.add_line(points[p1], points[p2]))
+                    lines.append(geom.add_line(points[p2], points[p4]))
+                    lines.append(geom.add_line(points[p4], points[p3]))
+                    lines.append(geom.add_line(points[p3], points[p1]))
+            
+            # Create surfaces
+            surfaces = []
+            for i in range(0, len(lines), 4):
+                loop = geom.add_curve_loop(lines[i:i+4])
+                surfaces.append(geom.add_plane_surface(loop))
+            
+            # Create volume
+            volume = geom.add_volume(surfaces)
+            
+            # Generate mesh
+            self.geometry = geom
+            self.mesh = geom.generate_mesh()
     
     def export_mesh(self, filename: str, format: str = 'msh') -> None:
         """Export mesh to file.
         
         Args:
             filename: Output filename
-            format: Mesh format (msh, vtk, etc.)
+            format: Mesh format (msh, stl, vtk, etc.)
         """
         if self.mesh is None:
-            raise ValueError("Mesh not generated. Call generate_geometry first.")
+            raise ValueError("Mesh not generated. Call generate_geometry() first.")
         
+        # Save mesh
         gmsh.write(filename)
     
     def visualize(self, interactive: bool = True) -> None:
-        """Visualize the mesh in Gmsh GUI.
+        """Visualize mesh in Gmsh GUI.
         
         Args:
             interactive: Whether to show interactive GUI
         """
         if self.mesh is None:
-            raise ValueError("Mesh not generated. Call generate_geometry first.")
+            raise ValueError("Mesh not generated. Call generate_geometry() first.")
         
-        if interactive:
-            gmsh.fltk.initialize()
-            gmsh.fltk.run()
+        # Show mesh
+        gmsh.fltk.initialize()
+        gmsh.fltk.run()
+        gmsh.fltk.finalize()
     
     def get_mesh_data(self) -> Tuple[np.ndarray, np.ndarray]:
         """Get mesh data as numpy arrays.
@@ -91,48 +134,31 @@ class GmshVisualizer:
             Tuple of (vertices, faces) arrays
         """
         if self.mesh is None:
-            raise ValueError("Mesh not generated. Call generate_geometry first.")
+            raise ValueError("Mesh not generated. Call generate_geometry() first.")
         
         # Get mesh data
-        nodes = self.mesh.points
-        elements = self.mesh.cells_dict['triangle']
+        vertices = np.array(self.mesh.points)
+        faces = np.array(self.mesh.cells_dict['triangle'])
         
-        return nodes, elements
+        return vertices, faces
     
     def calculate_mesh_quality(self) -> Dict[str, float]:
         """Calculate mesh quality metrics.
         
         Returns:
-            Dictionary of mesh quality metrics
+            Dictionary of quality metrics
         """
         if self.mesh is None:
-            raise ValueError("Mesh not generated. Call generate_geometry first.")
+            raise ValueError("Mesh not generated. Call generate_geometry() first.")
         
-        # Get mesh data
-        nodes, elements = self.get_mesh_data()
-        
-        # Calculate element quality metrics
-        qualities = []
-        for element in elements:
-            # Get element vertices
-            v1, v2, v3 = nodes[element]
-            
-            # Calculate element area
-            area = 0.5 * np.linalg.norm(np.cross(v2 - v1, v3 - v1))
-            
-            # Calculate element quality (ratio of inscribed to circumscribed circle)
-            a = np.linalg.norm(v2 - v3)
-            b = np.linalg.norm(v1 - v3)
-            c = np.linalg.norm(v1 - v2)
-            s = (a + b + c) / 2
-            quality = 4 * np.sqrt(3) * area / (a**2 + b**2 + c**2)
-            qualities.append(quality)
+        # Calculate quality metrics
+        quality = gmsh.model.mesh.getElementQualities()
         
         return {
-            'min_quality': min(qualities),
-            'max_quality': max(qualities),
-            'avg_quality': np.mean(qualities),
-            'std_quality': np.std(qualities)
+            'min_quality': min(quality),
+            'max_quality': max(quality),
+            'avg_quality': np.mean(quality),
+            'std_quality': np.std(quality)
         }
     
     def refine_mesh(self, target_size: float) -> None:
@@ -142,14 +168,14 @@ class GmshVisualizer:
             target_size: Target element size
         """
         if self.mesh is None:
-            raise ValueError("Mesh not generated. Call generate_geometry first.")
+            raise ValueError("Mesh not generated. Call generate_geometry() first.")
         
-        # Set mesh size
-        self.geometry.set_mesh_size_callback(lambda dim, tag, x, y, z, lc: target_size)
+        # Set target size
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), target_size)
         
-        # Regenerate mesh
-        self.mesh = self.geometry.generate_mesh()
+        # Refine mesh
+        gmsh.model.mesh.refine()
     
     def __del__(self):
-        """Clean up Gmsh."""
+        """Clean up Gmsh resources."""
         gmsh.finalize() 

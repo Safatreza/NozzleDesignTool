@@ -1,56 +1,44 @@
 # Nozzle Design Tool
 
-A comprehensive tool for designing and analyzing rocket engine nozzles, featuring:
-- 2D and 3D visualization of nozzle geometry
-- Performance analysis and optimization
-- Heat transfer analysis
-- Machine learning-based optimization
-- Export to various CAD formats
-- Web interface for easy access
+A comprehensive Python-based tool for designing and analyzing rocket nozzles. This tool provides advanced features for nozzle design, flow analysis, and visualization using Gmsh and Cantera.
 
 ## Features
 
 - **Nozzle Design**
-  - Contour optimization for maximum thrust
-  - Target Mach number optimization
-  - Multiple propellant combinations
+  - Conical and bell nozzle geometries
+  - Customizable expansion ratios
   - Material selection and thermal analysis
+  - Performance optimization
+
+- **Flow Analysis**
+  - Compressible flow calculations
+  - Real gas effects using Cantera
+  - Multiple flow regimes support
+  - Performance metrics calculation
 
 - **Visualization**
-  - 2D contour plots
-  - Performance parameter plots
-  - Heat transfer visualization
-  - Interactive 3D view
-  - Altitude optimization plots
+  - 3D mesh generation with Gmsh
+  - Flow property visualization
+  - Contour plots
+  - Interactive 3D views
 
-- **Analysis**
-  - Thrust coefficient calculation
-  - Specific impulse analysis
-  - Heat transfer analysis
-  - Wall temperature prediction
-  - Efficiency calculations
-
-- **Optimization**
-  - Machine learning-based optimization
-  - Multi-objective optimization
-  - Constraint handling
-  - Sensitivity analysis
-
-- **Export**
-  - STL format for 3D printing
-  - OBJ format for visualization
-  - STEP format for CAD
-  - IGES format for CAD
-  - Full design report generation
+- **Export Capabilities**
+  - STL, OBJ, STEP, and IGES formats
+  - Flow data export
+  - Performance reports
+  - Manufacturing drawings
 
 ## Installation
 
-### Local Installation
+### Prerequisites
+- Python 3.9 or higher
+- Docker (optional, for containerized deployment)
 
+### Local Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/nozzle-design-tool.git
-   cd nozzle-design-tool
+   git clone https://github.com/Safatreza/NozzleDesignTool.git
+   cd NozzleDesignTool
    ```
 
 2. Create a virtual environment:
@@ -64,17 +52,7 @@ A comprehensive tool for designing and analyzing rocket engine nozzles, featurin
    pip install -r requirements.txt
    ```
 
-4. Run the application:
-   ```bash
-   # For desktop GUI
-   python -m nozzle_design.gui
-
-   # For web interface
-   python -m nozzle_design.web_app
-   ```
-
 ### Docker Installation
-
 1. Build the Docker image:
    ```bash
    docker build -t nozzle-design-tool .
@@ -82,72 +60,73 @@ A comprehensive tool for designing and analyzing rocket engine nozzles, featurin
 
 2. Run the container:
    ```bash
-   docker run -p 5000:5000 nozzle-design-tool
+   docker run -it --rm nozzle-design-tool
    ```
-
-3. Access the web interface at `http://localhost:5000`
 
 ## Usage
 
-### Desktop GUI
+### Basic Usage
+```python
+from nozzle_design import NozzleDesigner
 
-1. Launch the application
-2. Enter input parameters:
-   - Propellant type
-   - Chamber conditions
-   - Thrust requirements
-   - Optimization type
-3. Click "Calculate" to generate the design
-4. Use the "Optimize" button for advanced optimization
-5. View results in various plots and 3D view
-6. Export the design in your preferred format
+# Create a nozzle designer instance
+designer = NozzleDesigner(
+    chamber_pressure=10e6,  # 10 MPa
+    chamber_temperature=3000,  # 3000 K
+    exit_pressure=101325,  # 1 atm
+    expansion_ratio=10.0,
+    material='copper'
+)
 
-### Web Interface
+# Generate nozzle geometry
+nozzle = designer.design_nozzle()
 
-1. Open your browser and navigate to `http://localhost:5000`
-2. Use the web interface to:
-   - Create new designs
-   - Load saved designs
-   - View interactive plots
-   - Export results
-   - Generate reports
+# Analyze flow
+flow_data = designer.analyze_flow()
+
+# Visualize results
+designer.visualize()
+```
+
+### Advanced Usage
+```python
+from nozzle_design import NozzleDesigner
+from nozzle_design.materials import get_material
+
+# Create custom nozzle design
+designer = NozzleDesigner(
+    chamber_pressure=10e6,
+    chamber_temperature=3000,
+    exit_pressure=101325,
+    expansion_ratio=10.0,
+    material=get_material('inconel'),
+    optimization_target='thrust'
+)
+
+# Optimize nozzle design
+optimized_nozzle = designer.optimize()
+
+# Export results
+designer.export_results('nozzle_design.zip')
+```
 
 ## Development
 
-### Project Structure
-
-```
-nozzle_design/
-├── __init__.py
-├── engineering_calculations.py
-├── combustion.py
-├── visualization.py
-├── visualization_3d.py
-├── gui.py
-├── web_app.py
-├── ml_optimization.py
-├── model_export.py
-└── session_manager.py
-```
-
 ### Running Tests
-
 ```bash
 pytest tests/
 ```
 
-### Code Style
-
-The project uses:
-- Black for code formatting
-- Flake8 for linting
-- MyPy for type checking
-
-Run the checks:
+### Code Quality
 ```bash
+# Format code
 black .
+
+# Lint code
 flake8
-mypy .
+
+# Type checking
+mypy nozzle_design/
 ```
 
 ## Contributing
@@ -164,7 +143,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- NASA CEA for thermodynamic calculations
-- OpenMDAO for optimization framework
-- VTK for 3D visualization
-- Plotly for interactive plots
+- Gmsh for mesh generation
+- Cantera for flow analysis
+- NASA CEA for thermodynamic properties
+
+## Contact
+
+For questions and support, please open an issue in the GitHub repository.

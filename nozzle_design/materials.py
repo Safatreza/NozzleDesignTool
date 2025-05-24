@@ -5,65 +5,66 @@ from typing import Dict, Optional
 
 @dataclass
 class Material:
-    """Material properties for thermal analysis."""
+    """Class for material properties."""
     name: str
-    density: float  # kg/m³
+    density: float  # kg/m^3
     thermal_conductivity: float  # W/(m·K)
     specific_heat: float  # J/(kg·K)
-    yield_strength: float  # Pa
     thermal_expansion: float  # 1/K
+    elastic_modulus: float  # Pa
+    yield_strength: float  # Pa
     melting_point: float  # K
-    gamma: float  # Specific heat ratio
-    
+    gamma: float = 1.4  # Specific heat ratio, default 1.4
+
     @property
     def thermal_diffusivity(self) -> float:
-        """Calculate thermal diffusivity.
-        
-        Returns:
-            Thermal diffusivity in m²/s
-        """
+        """Thermal diffusivity in m^2/s."""
         return self.thermal_conductivity / (self.density * self.specific_heat)
 
-# Common materials for rocket nozzles
+# Material properties database
 MATERIALS = {
     'copper': Material(
-        name='Copper',
+        name='copper',
         density=8960.0,
         thermal_conductivity=401.0,
         specific_heat=385.0,
-        yield_strength=250e6,
         thermal_expansion=16.5e-6,
+        elastic_modulus=110e9,
+        yield_strength=33e6,
         melting_point=1357.77,
         gamma=1.4
     ),
     'steel': Material(
-        name='Steel',
+        name='steel',
         density=7850.0,
         thermal_conductivity=50.0,
         specific_heat=490.0,
-        yield_strength=250e6,
         thermal_expansion=12.0e-6,
+        elastic_modulus=200e9,
+        yield_strength=250e6,
         melting_point=1811.0,
         gamma=1.4
     ),
     'titanium': Material(
-        name='Titanium',
+        name='titanium',
         density=4500.0,
         thermal_conductivity=21.9,
         specific_heat=520.0,
-        yield_strength=825e6,
         thermal_expansion=8.6e-6,
+        elastic_modulus=116e9,
+        yield_strength=140e6,
         melting_point=1941.0,
         gamma=1.4
     ),
     'inconel': Material(
-        name='Inconel',
+        name='inconel',
         density=8440.0,
         thermal_conductivity=11.4,
         specific_heat=434.0,
-        yield_strength=1034e6,
         thermal_expansion=13.0e-6,
-        melting_point=1723.0,
+        elastic_modulus=214e9,
+        yield_strength=1034e6,
+        melting_point=1673.0,
         gamma=1.4
     )
 }
@@ -73,51 +74,49 @@ def get_material(name: str) -> Material:
     
     Args:
         name: Material name (case-insensitive)
-        
     Returns:
-        Material object with properties
-        
+        Material object
     Raises:
-        KeyError: If material name is not found
+        ValueError: If material not found
     """
-    return MATERIALS[name.lower()]
+    material = MATERIALS.get(name.lower())
+    if material is None:
+        raise ValueError(f"Material '{name}' not found")
+    return material
 
 def calculate_thermal_stress(material: Material,
                            temperature_gradient: float,
                            length: float) -> float:
-    """Calculate thermal stress in a material.
+    """Calculate thermal stress.
     
     Args:
-        material: Material properties
+        material: Material object
         temperature_gradient: Temperature gradient in K/m
-        length: Length scale in meters
-        
+        length: Length in m
     Returns:
-        Thermal stress in Pascals
+        Thermal stress in Pa
     """
-    return material.thermal_expansion * material.thermal_conductivity * temperature_gradient * length
+    return material.thermal_expansion * material.elastic_modulus * temperature_gradient * length
 
 def calculate_safety_factor(material: Material,
                           stress: float) -> float:
-    """Calculate safety factor for a given stress.
+    """Calculate safety factor.
     
     Args:
-        material: Material properties
-        stress: Applied stress in Pascals
-        
+        material: Material object
+        stress: Applied stress in Pa
     Returns:
-        Safety factor (yield_strength / stress)
+        Safety factor
     """
     return material.yield_strength / stress
 
 def calculate_heat_capacity(material: Material,
                           volume: float) -> float:
-    """Calculate heat capacity for a given volume.
+    """Calculate heat capacity.
     
     Args:
-        material: Material properties
-        volume: Volume in cubic meters
-        
+        material: Material object
+        volume: Volume in m^3
     Returns:
         Heat capacity in J/K
     """
@@ -129,11 +128,20 @@ def calculate_thermal_resistance(material: Material,
     """Calculate thermal resistance.
     
     Args:
-        material: Material properties
-        length: Length in meters
-        area: Cross-sectional area in square meters
-        
+        material: Material object
+        length: Length in m
+        area: Cross-sectional area in m^2
     Returns:
         Thermal resistance in K/W
     """
-    return length / (material.thermal_conductivity * area) 
+    return length / (material.thermal_conductivity * area)
+
+def calculate_thermal_diffusivity(material: Material) -> float:
+    """Calculate thermal diffusivity.
+    
+    Args:
+        material: Material object
+    Returns:
+        Thermal diffusivity in m^2/s
+    """
+    return material.thermal_conductivity / (material.density * material.specific_heat) 
