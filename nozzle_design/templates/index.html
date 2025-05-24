@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nozzle Design Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/plotly.js@2.14.0/dist/plotly.min.css" rel="stylesheet">
+    <style>
+        .plot-container {
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 10px;
+        }
+        .nav-tabs {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Nozzle Design Tool</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="newDesign">New Design</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="loadDesign">Load Design</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="exportDesign">Export Design</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Input Panel -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Input Parameters</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="inputForm">
+                            <div class="mb-3">
+                                <label class="form-label">Propellant Type</label>
+                                <select class="form-select" name="propellant_type" required>
+                                    <option value="LOX_LH2">LOX/LH2</option>
+                                    <option value="LOX_RP1">LOX/RP-1</option>
+                                    <option value="N2O4_MMH">N2O4/MMH</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Chamber Pressure (MPa)</label>
+                                <input type="number" class="form-control" name="chamber_pressure" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Chamber Temperature (K)</label>
+                                <input type="number" class="form-control" name="chamber_temperature" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Fuel-Oxidizer Ratio</label>
+                                <input type="number" class="form-control" name="fuel_ratio" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Thrust (kN)</label>
+                                <input type="number" class="form-control" name="thrust" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Optimization Type</label>
+                                <select class="form-select" name="optimization_type" required>
+                                    <option value="thrust">Maximize Thrust</option>
+                                    <option value="mach">Target Mach Number</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3" id="targetValueGroup" style="display: none;">
+                                <label class="form-label">Target Value</label>
+                                <input type="number" class="form-control" name="target_value">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Material</label>
+                                <select class="form-select" name="material" required>
+                                    <option value="copper">Copper</option>
+                                    <option value="steel">Steel</option>
+                                    <option value="titanium">Titanium</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Calculate</button>
+                            <button type="button" class="btn btn-secondary" id="optimizeBtn">Optimize</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="col-md-8">
+                <ul class="nav nav-tabs" id="outputTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#contour">Contour</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#performance">Performance</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#heat">Heat Transfer</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#altitude">Altitude</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#3d">3D View</a>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="contour">
+                        <div class="plot-container" id="contourPlot"></div>
+                    </div>
+                    <div class="tab-pane fade" id="performance">
+                        <div class="plot-container" id="performancePlot"></div>
+                    </div>
+                    <div class="tab-pane fade" id="heat">
+                        <div class="plot-container" id="heatPlot"></div>
+                    </div>
+                    <div class="tab-pane fade" id="altitude">
+                        <div class="plot-container" id="altitudePlot"></div>
+                    </div>
+                    <div class="tab-pane fade" id="3d">
+                        <div class="plot-container" id="3dPlot"></div>
+                    </div>
+                </div>
+
+                <!-- Results Summary -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Results Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p><strong>Thrust Coefficient:</strong> <span id="thrustCoeff">-</span></p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Specific Impulse:</strong> <span id="specificImpulse">-</span></p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Efficiency:</strong> <span id="efficiency">-</span></p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Exit Mach:</strong> <span id="exitMach">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal fade" id="loadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Load Design</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="list-group" id="sessionList">
+                        <!-- Sessions will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="exportModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Export Design</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Format</label>
+                        <select class="form-select" id="exportFormat">
+                            <option value="stl">STL</option>
+                            <option value="obj">OBJ</option>
+                            <option value="step">STEP</option>
+                            <option value="iges">IGES</option>
+                            <option value="all">All Formats</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="exportBtn">Export</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plotly.js@2.14.0/dist/plotly.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script>
+        // Initialize plots
+        const plots = {
+            contour: document.getElementById('contourPlot'),
+            performance: document.getElementById('performancePlot'),
+            heat: document.getElementById('heatPlot'),
+            altitude: document.getElementById('altitudePlot'),
+            '3d': document.getElementById('3dPlot')
+        };
+
+        // Form handling
+        const form = document.getElementById('inputForm');
+        const optimizationType = form.querySelector('[name="optimization_type"]');
+        const targetValueGroup = document.getElementById('targetValueGroup');
+
+        optimizationType.addEventListener('change', () => {
+            targetValueGroup.style.display = 
+                optimizationType.value === 'mach' ? 'block' : 'none';
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            try {
+                const response = await fetch('/api/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) throw new Error('Calculation failed');
+                
+                const result = await response.json();
+                updatePlots(result);
+                updateResults(result);
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Optimization
+        document.getElementById('optimizeBtn').addEventListener('click', async () => {
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            try {
+                const response = await fetch('/api/optimize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) throw new Error('Optimization failed');
+                
+                const result = await response.json();
+                updatePlots(result.geometry);
+                updateResults(result.geometry);
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Session management
+        document.getElementById('loadDesign').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/sessions');
+                const sessions = await response.json();
+                
+                const sessionList = document.getElementById('sessionList');
+                sessionList.innerHTML = sessions.map(session => `
+                    <a href="#" class="list-group-item list-group-item-action" 
+                       data-session-id="${session.id}">
+                        ${session.name} (${new Date(session.created_at).toLocaleString()})
+                    </a>
+                `).join('');
+                
+                new bootstrap.Modal(document.getElementById('loadModal')).show();
+            } catch (error) {
+                alert('Failed to load sessions');
+            }
+        });
+
+        document.getElementById('sessionList').addEventListener('click', async (e) => {
+            if (e.target.tagName === 'A') {
+                const sessionId = e.target.dataset.sessionId;
+                try {
+                    const response = await fetch(`/api/sessions/${sessionId}`);
+                    const session = await response.json();
+                    
+                    // Fill form with session data
+                    Object.entries(session).forEach(([key, value]) => {
+                        const input = form.querySelector(`[name="${key}"]`);
+                        if (input) input.value = value;
+                    });
+                    
+                    // Update plots and results
+                    updatePlots(session.geometry);
+                    updateResults(session.geometry);
+                    
+                    bootstrap.Modal.getInstance(document.getElementById('loadModal')).hide();
+                } catch (error) {
+                    alert('Failed to load session');
+                }
+            }
+        });
+
+        // Export handling
+        document.getElementById('exportDesign').addEventListener('click', () => {
+            new bootstrap.Modal(document.getElementById('exportModal')).show();
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', async () => {
+            const format = document.getElementById('exportFormat').value;
+            try {
+                const response = await fetch('/api/export', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        format,
+                        segments: currentSegments
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Export failed');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `nozzle.${format === 'all' ? 'zip' : format}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                bootstrap.Modal.getInstance(document.getElementById('exportModal')).hide();
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Plot updates
+        let currentSegments = [];
+
+        function updatePlots(data) {
+            currentSegments = data.segments;
+            
+            // Contour plot
+            const contourData = [{
+                x: data.segments.map(s => s.start_x),
+                y: data.segments.map(s => s.start_radius),
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Nozzle Contour'
+            }];
+            
+            Plotly.newPlot(plots.contour, contourData, {
+                title: 'Nozzle Contour',
+                xaxis: { title: 'Axial Position (m)' },
+                yaxis: { title: 'Radius (m)' }
+            });
+            
+            // Performance plot
+            const performanceData = [
+                {
+                    x: data.segments.map(s => s.start_x),
+                    y: data.segments.map(s => s.mach_number),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Mach Number'
+                },
+                {
+                    x: data.segments.map(s => s.start_x),
+                    y: data.segments.map(s => s.pressure / 1e6),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Pressure (MPa)',
+                    yaxis: 'y2'
+                }
+            ];
+            
+            Plotly.newPlot(plots.performance, performanceData, {
+                title: 'Performance Parameters',
+                xaxis: { title: 'Axial Position (m)' },
+                yaxis: { title: 'Mach Number' },
+                yaxis2: {
+                    title: 'Pressure (MPa)',
+                    overlaying: 'y',
+                    side: 'right'
+                }
+            });
+            
+            // Heat transfer plot
+            const heatData = [
+                {
+                    x: data.segments.map(s => s.start_x),
+                    y: data.segments.map(s => s.wall_temperature),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Wall Temperature (K)'
+                },
+                {
+                    x: data.segments.map(s => s.start_x),
+                    y: data.segments.map(s => s.heat_flux / 1e6),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Heat Flux (MW/m²)',
+                    yaxis: 'y2'
+                }
+            ];
+            
+            Plotly.newPlot(plots.heat, heatData, {
+                title: 'Heat Transfer Parameters',
+                xaxis: { title: 'Axial Position (m)' },
+                yaxis: { title: 'Wall Temperature (K)' },
+                yaxis2: {
+                    title: 'Heat Flux (MW/m²)',
+                    overlaying: 'y',
+                    side: 'right'
+                }
+            });
+            
+            // 3D view
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, plots['3d'].clientWidth / plots['3d'].clientHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer();
+            
+            renderer.setSize(plots['3d'].clientWidth, plots['3d'].clientHeight);
+            plots['3d'].appendChild(renderer.domElement);
+            
+            // Create nozzle geometry
+            const points = data.segments.map(s => new THREE.Vector3(s.start_x, s.start_radius, 0));
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
+            const nozzle = new THREE.Line(geometry, material);
+            scene.add(nozzle);
+            
+            camera.position.z = 5;
+            
+            function animate() {
+                requestAnimationFrame(animate);
+                nozzle.rotation.y += 0.01;
+                renderer.render(scene, camera);
+            }
+            
+            animate();
+        }
+
+        function updateResults(data) {
+            const metrics = data.performance_metrics;
+            document.getElementById('thrustCoeff').textContent = 
+                metrics.thrust_coefficient.toFixed(3);
+            document.getElementById('specificImpulse').textContent = 
+                `${metrics.specific_impulse.toFixed(0)} s`;
+            document.getElementById('efficiency').textContent = 
+                `${(metrics.efficiency * 100).toFixed(1)}%`;
+            document.getElementById('exitMach').textContent = 
+                metrics.exit_mach.toFixed(2);
+        }
+    </script>
+</body>
+</html> 
